@@ -1,41 +1,21 @@
 {
-  "name": "discord-salacious-scribe",
-  "version": "1.0.0",
-  "description": "Export transcripts of discord channel history",
-  "main": "index.js",
-  "type": "module",
-  "engines": {
-    "node": ">=16"
-  },
+  "name": "salacious-scribe-bot",
+  "version": "0.0.1",
+  "description": "Export Discord chat to Markdown as a bot",
+  "main": "bot.js",
   "scripts": {
     "start": "node index.js",
-    "register": "node register-commands.js",
-    "dev": "NODE_ENV=development nodemon index.js | pino-pretty",
-    "lint": "eslint",
-    "fix": "eslint --fix",
-    "build-image": "gcloud builds submit --pack image=us-central1-docker.pkg.dev/$GOOGLE_CLOUD_PROJECT/samples/microservice-template:manual",
-    "deploy": "gcloud run deploy microservice-template --image us-central1-docker.pkg.dev/$GOOGLE_CLOUD_PROJECT/samples/microservice-template:manual --region us-central1",
-    "test": "mocha test/app.test.js --check-leaks",
-    "system-test": "mocha test/system.test.js --timeout=180000"
+    "register": "node register-commands.js"
   },
   "author": "chaddiecat",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
-    "gcp-metadata": "^6.0.0",
-    "google-auth-library": "^9.0.0",
-    "pino": "^9.0.0",
-    "pino-http": "^10.0.0",
-    "@discordjs/rest": "^1.7.1",
+    "@discordjs/rest": "^2",
+    "discord-api-types": "^0.37.67",
+    "dotenv": "^16.4.1",
+    "universal-analytics": "^0.4.23",
     "discord.js": "^14.14.1",
-    "dotenv": "^16.4.1"
-  },
-  "devDependencies": {
-    "eslint": "^9.0.0",
-    "eslint-config-google": "^0.14.0",
-    "got": "^14.0.0",
-    "mocha": "^11.0.0",
-    "nodemon": "^3.0.0",
-    "supertest": "^7.0.0"
+    "tweetnacl": "^1.0.3",
+    "express": "^4.18.3"
   }
 }
