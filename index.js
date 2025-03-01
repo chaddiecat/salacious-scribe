@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +46,6 @@ process.on('SIGTERM', () => {
 });
 
 main();
-=======
 // index.js
 const { Client, GatewayIntentBits, SlashCommandBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const fs = require('fs');
@@ -190,4 +188,3 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(token);
->>>>>>> 7cb77e4 (Intial commit, working bot)
