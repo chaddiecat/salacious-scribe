@@ -1,68 +1,16 @@
-// Copyright 2021 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { InteractionType, InteractionResponseType } = require('discord-interactions');
+const ua = require('universal-analytics');
+const nacl = require('tweetnacl');
+const express = require('express');
 
-import app from './app.js';
-import {logger, initLogCorrelation} from './utils/logging.js';
-import {fetchProjectId} from './utils/metadata.js';
-
-/**
- * Initialize app and start Express server
- */
-const main = async () => {
-  let project = process.env.GOOGLE_CLOUD_PROJECT;
-  if (!project) {
-    try {
-      project = await fetchProjectId();
-    } catch {
-      logger.warn('Could not fetch Project Id for tracing.');
-    }
-  }
-  // Initialize request-based logger with project Id
-  initLogCorrelation(project);
-
-  // Start server listening on PORT env var
-  const PORT = process.env.PORT || 8080;
-  app.listen(PORT, () => logger.info(`Listening on port ${PORT}`));
-};
-
-/**
- * Listen for termination signal
- */
-process.on('SIGTERM', () => {
-  // Clean up resources on shutdown
-  logger.info('Caught SIGTERM.');
-  logger.flush();
-});
-
-main();
-// index.js
-const { Client, GatewayIntentBits, SlashCommandBuilder, AttachmentBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
-const fs = require('fs');
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord-api-types/v9');
-require('dotenv').config(); // Load environment variables from .env file
-
-// Initialize Discord client
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildPresences, GatewayIntentBits.MessageContent] });
+require('dotenv').config();
 
 const token = process.env.DISCORD_BOT_TOKEN;
-const applicationId = '1345181203791216680';
+const applicationId = process.env.DISCORD_APPLICATION_ID;
+const trackingId = process.env.GOOGLE_ANALYTICS_TRACKING_ID; // Your Google Analytics Tracking ID
+const publicKey = process.env.DISCORD_PUBLIC_KEY; // Your Discord bot's public key
 
-// Replace with your development guild ID
-const DEV_GUILD_ID = '1296841933045371001';
-
-// Define the /scribe command
 const commands = [
     new SlashCommandBuilder()
         .setName('scribe')
@@ -82,109 +30,132 @@ const commands = [
                 .setRequired(false)),
 ].map(command => command.toJSON());
 
-// Register slash commands
-const rest = new REST({ version: '9' }).setToken(token);
+const app = express();
 
-(async () => {
+function verifySignature(request) {
+    const signature = request.get('X-Signature-Ed25519');
+    const timestamp = request.get('X-Signature-Timestamp');
+    const body = request.rawBody; // rawBody is expected to be present on the request object
+
+    if (!signature || !timestamp || !body) {
+        return false;
+    }
+
     try {
-        console.log('Started refreshing application (/) commands.');
-
-        const data = await rest.put(
-            Routes.applicationGuildCommands(applicationId, DEV_GUILD_ID),
-            { body: commands },
+        const isVerified = nacl.sign.detached.verify(
+            Buffer.from(timestamp + body),
+            Buffer.from(signature, 'hex'),
+            Buffer.from(publicKey, 'hex')
         );
-
-        console.log('Successfully reloaded application (/) commands.');
-        console.log(`Successfully registered ${data.length} application commands.`);
+        return isVerified;
     } catch (error) {
-        console.error('Error registering application commands:');
-        console.error(error.message);
-        console.error(error.stack);
-        if (error.response) {
-            console.error(`Data: ${JSON.stringify(error.response.data)}`);
-            console.error(`Status: ${error.response.status}`);
-            console.error(`Headers: ${JSON.stringify(error.response.headers)}`);
-        }
+        console.error('Signature verification error:', error);
+        return false;
     }
-})();
+}
 
-// To register commands dynamically for each guild the bot is in:
-// 1. Listen for the 'guildCreate' event.
-// 2. When the event is triggered, grab the guild ID.
-// 3. Register the commands for that specific guild using Routes.applicationGuildCommands.
-
-client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-    console.log('Connected to Discord gateway.');
-});
-
-client.on('shardError', error => {
-    console.error('A websocket connection encountered an error:', error);
-});
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return;
-
-    await interaction.deferReply({ ephemeral: true }); // Defer the reply
-
-    const includeUsernames = interaction.options.getBoolean('usernames') ?? false;
-    const includeTimestamps = interaction.options.getBoolean('timestamps') ?? false;
-    const includeReactions = interaction.options.getBoolean('reactions') ?? false;
-    const filename = interaction.options.getString('filename');
-
-   // Fetch messages
-    const messages = await interaction.channel.messages.fetch({ limit: 100 }); // Adjust limit as needed
-
-    let chatlog = '';
-
-    // Fetch all messages
-    let lastId;
-    while (true) {
-        const options = { limit: 100 };
-        if (lastId) {
-            options.before = lastId;
-        }
-
-        const messages = await interaction.channel.messages.fetch(options);
-
-        if (!messages.size) {
-            break;
-        }
-
-        chatlog += messages.map(msg => {
-            let line = '';
-            if (includeTimestamps) {
-                line += `[${msg.createdAt.toISOString()}] `;
-            }
-            if (includeUsernames) {
-                line += `${msg.author.username}: `;
-            }
-            // Remove user tags
-            let content = msg.content.replace(/<@!?\d+>/g, '');
-
-            line += content;
-
-            if (includeReactions) {
-                line += ` ${msg.reactions.cache.map(reaction => reaction.emoji.name).join(' ')}`;
-            }
-
-            return line;
-        }).reverse().join('\n\n');
-
-        lastId = messages.last().id;
+app.post('/', express.raw({ type: 'application/json' }), async (req, res) => {
+        if (req.method !== 'POST') {
+        return res.status(405).send('Method Not Allowed');
+    }
+    // Verify the signature
+    if (!verifySignature(req)) {
+        return res.status(401).send('Invalid signature');
     }
 
-    // Sanitize filename
-    const sanitizedFilename = filename ? filename.replace(/[^a-z0-9]/gi, '_').toLowerCase() : interaction.channel.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const { body } = req;
 
-    // Create a buffer from the chatlog
-    const buffer = Buffer.from(chatlog, 'utf-8');
+    if (body.type === InteractionType.PING) {
+        return res.status(200).send({ type: InteractionResponseType.PONG });
+    }
 
-    // Create a Discord attachment
-    const attachment = new AttachmentBuilder(buffer, { name: `${sanitizedFilename}.md` });
+    if (body.type === InteractionType.APPLICATION_COMMAND) {
+        const { data, guild_id, channel_id } = body;
+        const { name } = data;
 
-    // Reply with the attachment
-    await interaction.editReply({ files: [attachment] });
+        if (name === 'scribe') {
+            let messagesTranscribed = 0;
+            const flags = data.options?.find(option => option.name === 'flags')?.value;
+            const includeUsernames = flags?.includes('usernames') ?? false;
+            const includeTimestamps = flags?.includes('timestamps') ?? false;
+            const includeReactions = flags?.includes('reactions') ?? false;
+            const filename = data.options?.find(option => option.name === 'filename')?.value;
+
+            const { REST } = require('@discordjs/rest');
+            const { Routes } = require('discord-api-types/v9');
+
+            const discordRest = new REST({ version: '9' }).setToken(token);
+
+            async function fetchMessages(channelId, before) {
+                const options = {
+                    limit: 100,
+                };
+                if (before) {
+                    options.before = before;
+                }
+
+                try {
+                    const messages = await discordRest.get(Routes.channelMessages(channelId), { query: new URLSearchParams(options) });
+                    return messages;
+                } catch (error) {
+                    console.error('Error fetching messages:', error);
+                    return [];
+                }
+            }
+
+            let chatlog = '';
+            let lastId;
+
+            while (true) {
+                const messages = await fetchMessages(channel_id, lastId);
+
+                if (!messages || messages.length === 0) {
+                    break;
+                }
+
+                chatlog += messages.map(msg => {
+                    let line = '';
+                    if (includeTimestamps) {
+                        line += `[${new Date(msg.timestamp).toISOString()}] `;
+                    }
+                    if (includeUsernames) {
+                        line += `${msg.author.username}: `;
+                    }
+                    let content = msg.content.replace(/<@!?\d+>/g, '');
+                    line += content;
+                    if (includeReactions) {
+                        line += ` ${msg.reactions?.map(reaction => reaction.emoji.name).join(' ') ?? ''}`;
+                    }
+                    messagesTranscribed++;
+                    return line;
+                }).reverse().join('\n\n');
+
+                lastId = messages[0].id; // Use the first message's ID for 'before'
+            }
+
+            const sanitizedFilename = filename ? filename.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'transcript';
+            const buffer = Buffer.from(chatlog, 'utf-8');
+            const attachment = new AttachmentBuilder(buffer, { name: `${sanitizedFilename}.md` });
+
+            // Google Analytics
+            const visitor = ua(trackingId, {
+                cid: guild_id || 'none',
+            });
+
+            visitor.event('Scribe', 'Markdown Generated', { sessionControl: 'start' }).send();
+            visitor.event('Scribe', 'Messages Transcribed', messagesTranscribed).send();
+
+            return res.status(200).send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                    content: 'Here is your chatlog!',
+                    files: [attachment],
+                },
+            });
+        }
+    }
+
+    return res.status(400).send('Unknown interaction type');
 });
 
-client.login(token);
+exports.handler = app;
