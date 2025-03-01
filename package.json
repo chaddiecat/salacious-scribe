@@ -1,7 +1,7 @@
 {
-  "name": "cloud-run-microservice-template",
+  "name": "discord-salacious-scribe",
   "version": "1.0.0",
-  "description": "Microservice template for Cloud Run",
+  "description": "Export transcripts of discord channel history",
   "main": "index.js",
   "type": "module",
   "engines": {
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node index.js",
+    "register": "node register-commands.js",
     "dev": "NODE_ENV=development nodemon index.js | pino-pretty",
     "lint": "eslint",
     "fix": "eslint --fix",
@@ -17,14 +18,17 @@
     "test": "mocha test/app.test.js --check-leaks",
     "system-test": "mocha test/system.test.js --timeout=180000"
   },
-  "author": "Google LLC",
+  "author": "chaddiecat",
   "license": "Apache-2.0",
   "dependencies": {
     "express": "^4.19.2",
     "gcp-metadata": "^6.0.0",
     "google-auth-library": "^9.0.0",
     "pino": "^9.0.0",
-    "pino-http": "^10.0.0"
+    "pino-http": "^10.0.0",
+    "@discordjs/rest": "^1.7.1",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.1"
   },
   "devDependencies": {
     "eslint": "^9.0.0",
