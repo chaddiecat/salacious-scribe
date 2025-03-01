@@ -159,3 +159,8 @@ app.post('/', express.raw({ type: 'application/json' }), async (req, res) => {
 });
 
 exports.handler = app;
+
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
