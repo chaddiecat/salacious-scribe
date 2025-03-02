@@ -22,10 +22,18 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install dependencies.
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy local code to the container image.
-COPY . ./
+COPY . .
+
+# Copy the .env file into the container
+COPY .env .env
+
+# Copy bot.js into the container
+COPY bot.js bot.js
 
 # Run the web service on container startup.
 ENTRYPOINT [ "node", "index.js" ]
+
+EXPOSE 8080
