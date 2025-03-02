@@ -16,5 +16,5 @@ app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
     console.log('Starting Discord bot...');
     // Start the Discord bot after the Express server has started
-    bot.login(process.env.DISCORD_BOT_TOKEN); // Or however you log in your bot
+
 });

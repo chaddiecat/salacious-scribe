@@ -8,7 +8,6 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildPresences,
         GatewayIntentBits.MessageContent
     ]
 });
@@ -39,7 +38,7 @@ const commands = [
                 .setRequired(false)),
 ].map(command => command.toJSON());
 
-// Register slash commands
+// Register slash commands Globally
 const rest = new REST({ version: '9' }).setToken(token);
 
 (async () => {
@@ -65,6 +64,31 @@ const rest = new REST({ version: '9' }).setToken(token);
     }
 })();
 
+//Register slash commands on Guild Join
+client.on('guildCreate', async guild => {
+    console.log(`Bot joined guild: ${guild.name} (ID: ${guild.id})`);
+
+    try {
+        console.log('Started refreshing application (/) commands for guild.');
+
+        await rest.put(
+            Routes.applicationGuildCommands(applicationId, guild.id),
+            { body: commands },
+        );
+
+        console.log('Successfully reloaded application (/) commands for guild.');
+    } catch (error) {
+        console.error('Error registering application commands for guild:');
+        console.error(error.message);
+        console.error(error.stack);
+        if (error.response) {
+            console.error(`Data: ${JSON.stringify(error.response.data)}`);
+            console.error(`Status: ${error.response.status}`);
+            console.error(`Headers: ${JSON.stringify(error.response.headers)}`);
+        }
+    }
+});
+
 // To register commands dynamically for each guild the bot is in:
 // 1. Listen for the 'guildCreate' event.
 // 2. When the event is triggered, grab the guild ID.
@@ -82,7 +106,7 @@ client.on('shardError', error => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
-    await interaction.deferReply({ ephemeral: true }); // Defer the reply
+    await interaction.deferReply({ ephemeral: true }); // Acknowledge the interaction
 
     const includeUsernames = interaction.options.getBoolean('usernames') ?? false;
     const includeTimestamps = interaction.options.getBoolean('timestamps') ?? false;
@@ -117,7 +141,7 @@ client.on('interactionCreate', async interaction => {
                 line += `${msg.author.username}: `;
             }
             // Remove user tags
-            let content = msg.content.replace(/<@!?\d+>/g, '');
+            let content = msg.content.replace(/<@!?\\d+>/g, '');
 
             line += content;
 
@@ -144,6 +168,5 @@ client.on('interactionCreate', async interaction => {
     await interaction.editReply({ files: [attachment] });
 });
 
+module.exports = client;
 client.login(token);
-
-module.exports = client; // Export the client
